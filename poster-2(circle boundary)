@@ -1,16 +1,20 @@
 """
-city_multifractal_v8.py — circular mask fix for box-counting
+city_multifractal_v5_inscribed.py
 
-Key change over v4:
-  - Box-counting now masks out cells whose centres fall outside the circular
-    support before computing P_i. This removes geometrically-excluded corner
-    boxes from the partition function, which were the root cause of the
-    negative-q instability (those near-zero boxes get amplified by P_i^q for
-    q<<0 and corrupt the scaling regression).
-  - Reverted to H > 0 (no H>=3 threshold needed once corner boxes are gone).
-  - R² thresholds kept split but negative-q failures should now be rare.
-  - Panel B (dimension bars) fixed: xlim extended so "Euclidean limit" label
-    is not clipped.
+Identical to v8 except box-counting uses the largest square inscribed
+inside the circular support, rather than a circular mask applied to a
+full [0,1]² grid.
+
+Geometry:
+  v8  — full [0,1]² grid, then zero out cells whose centres fall outside
+         a circle of radius CIRC_MASK_RADIUS  (grid contains the circle)
+  v5  — histogram range clipped to [GRID_LO, GRID_HI]² which is the
+         largest square that fits inside the circular support
+         (circle contains the grid)
+
+Both approaches guarantee no geometrically-excluded corner boxes enter
+P_i. Everything else — Q range, R² thresholds, dimension extraction,
+panels, summary log — is identical to v8.
 """
 
 import sys, os, re
@@ -36,10 +40,12 @@ N_Q              = 40
 R2_THRESH_DENSE  = 0.97   # strict for q >= 0
 R2_THRESH_SPARSE = 0.89   # looser for q < 0
 
-# Radius in normalised [0,1]² space used to mask box centres.
-# 0.45 keeps a small margin inside the cropped region and avoids
-# partially-covered boundary boxes.
-CIRC_MASK_RADIUS = 0.45
+# Largest square inscribed inside the circular support.
+# After normalising to [0,1]², the circle sits at (0.5, 0.5) with
+# radius ~0.5. The inscribed square has half-side = 0.5 / sqrt(2).
+INSCRIBED_HALF = 0.5 / np.sqrt(2)   # ≈ 0.354
+GRID_LO = 0.5 - INSCRIBED_HALF      # ≈ 0.146
+GRID_HI = 0.5 + INSCRIBED_HALF      # ≈ 0.854
 
 # ── Dark/neon colour palette ──────────────────────────────────────────────────
 BG          = '#0a0a0f'
@@ -109,9 +115,9 @@ y_norm = (y_circ - y_circ.min()) / (y_circ.max() - y_circ.min())
 GRID_SIZES = np.array([54, 60, 64, 75, 82, 90, 100, 115])
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. Box-counting  (with circular mask)
+# 3. Box-counting  (inscribed square grid)
 # ─────────────────────────────────────────────────────────────────────────────
-print("[2/6] Running box-counting (circular mask active)...")
+print("[2/6] Running box-counting (inscribed square grid)...")
 q_values     = np.linspace(Q_MIN, Q_MAX, N_Q)
 epsilons     = 1.0 / GRID_SIZES
 log_eps      = np.log(epsilons)
@@ -123,21 +129,17 @@ tau_q_matrix = np.full((n_q, n_g), np.nan)
 n_boxes      = np.zeros(n_g)
 
 for i, bins in enumerate(GRID_SIZES):
-    H, _, _ = np.histogram2d(x_norm, y_norm, bins=bins, range=[[0,1],[0,1]])
-
-    # ── Circular mask ──────────────────────────────────────────────────────
-    # After normalising to [0,1]², the data circle sits at centre (0.5, 0.5).
-    # Zero out any box whose centre falls outside CIRC_MASK_RADIUS so that
-    # geometrically-excluded empty/sparse corner boxes never enter P_i.
-    # This is the root fix for negative-q instability.
-    cx_coords = (np.arange(bins) + 0.5) / bins
-    cy_coords = (np.arange(bins) + 0.5) / bins
-    xx, yy    = np.meshgrid(cx_coords, cy_coords, indexing='ij')
-    outside   = np.sqrt((xx - 0.5)**2 + (yy - 0.5)**2) > CIRC_MASK_RADIUS
-    H[outside] = 0
+    # ── Inscribed square grid ──────────────────────────────────────────────
+    # Histogram range clipped to [GRID_LO, GRID_HI]² — the largest square
+    # that fits entirely inside the circular support. Every cell is therefore
+    # guaranteed to lie within the circle, so no geometrically-excluded
+    # corner boxes can corrupt P_i for negative q.
+    H, _, _ = np.histogram2d(x_norm, y_norm, bins=bins,
+                             range=[[GRID_LO, GRID_HI],
+                                    [GRID_LO, GRID_HI]])
     # ───────────────────────────────────────────────────────────────────────
 
-    nz = H[H > 0]   # standard H>0 — safe now that corner boxes are zeroed
+    nz = H[H > 0]
     n_boxes[i] = len(nz)
     P_i = nz / nz.sum()
 
@@ -275,14 +277,21 @@ plt.rcParams.update({
     'axes.edgecolor':  '#2a2a4a',
 })
 
+
 # ── A: Density map ────────────────────────────────────────────────────────────
 fig, ax_map = plt.subplots(figsize=(10, 10), facecolor='#000')
 ax_map.set_facecolor('#000')
 ax_map.hist2d(x_norm, y_norm, bins=300, cmap='magma', norm=LogNorm())
-theta = np.linspace(0, 2*np.pi, 300)
-cx = (0.95*np.cos(theta) - x_circ.min()) / (x_circ.max() - x_circ.min())
-cy = (0.95*np.sin(theta) - y_circ.min()) / (y_circ.max() - y_circ.min())
-ax_map.plot(cx, cy, color='#ffffff', lw=0.6, alpha=0.3, ls='--')
+
+# Draw the inscribed square — this is the actual box-counting boundary
+sq = plt.Rectangle((GRID_LO, GRID_LO),
+                    GRID_HI - GRID_LO, GRID_HI - GRID_LO,
+                    linewidth=1.2, edgecolor='#00d4ff',
+                    facecolor='none', linestyle='--', alpha=0.6)
+ax_map.add_patch(sq)
+ax_map.text(GRID_LO + 0.01, GRID_HI + 0.01, 'box-counting region',
+            color='#00d4ff', fontsize=8, alpha=0.7, va='bottom')
+
 ax_map.set_title(
     f"Street Intersection Density  ·  {RADIUS_METERS/1000:.0f}km Urban Core  ·  {CITY_ADDRESS}",
     fontsize=13, color=TEXT, pad=12)
@@ -293,7 +302,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(OUT_DIR, f"{city_slug}_A_density.png"),
             dpi=150, bbox_inches='tight', facecolor='#000')
 plt.close()
-print(f"    → {city_slug}_A_density.png")
 
 # ── B: Dimension bars ─────────────────────────────────────────────────────────
 fig, ax_bar = plt.subplots(figsize=(7, 7), facecolor=BG)
@@ -310,7 +318,7 @@ if len(f_plot) > 0:
     ax_bar.set_xticklabels(
         ['$D_0$\n(capacity)', '$D_1$\n(information)', '$D_2$\n(correlation)'],
         color=TEXT, fontsize=11)
-    ax_bar.set_xlim(-0.6, 3.0)          # room for "Euclidean limit" label
+    ax_bar.set_xlim(-0.6, 3.0)
     ax_bar.set_ylim(0, 2.2)
     ax_bar.axhline(2.0, ls='--', color='#444466', lw=1.2, alpha=0.8)
     ax_bar.text(2.85, 2.02, 'Euclidean\nlimit',
@@ -470,9 +478,9 @@ Retained (Crop)  : {in_circle.sum():,} ({(in_circle.sum()/len(x_raw))*100:.1f}%)
 [3] TUNING PARAMETERS
 ─────────────────────────────────────────────────────────────────
 Grid Sizes (bins): {GRID_SIZES.tolist()}
+Grid geometry    : Inscribed square  [{GRID_LO:.3f}, {GRID_HI:.3f}]
 Q Range          : [{Q_MIN}, {Q_MAX}]
 N_Q (Steps)      : {N_Q}
-Circ mask radius : {CIRC_MASK_RADIUS}  (in normalised [0,1]² space)
 Box threshold    : H > 0
 R² Threshold (+q): {R2_THRESH_DENSE}
 R² Threshold (-q): {R2_THRESH_SPARSE}

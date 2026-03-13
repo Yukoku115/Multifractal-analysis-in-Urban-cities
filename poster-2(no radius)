@@ -20,10 +20,10 @@ CITY_ADDRESS  = sys.argv[1] if len(sys.argv) > 1 else "Manchester, UK"
 RADIUS_METERS = int(sys.argv[2]) if len(sys.argv) > 2 else 7000
 
 NETWORK_TYPE  = "all"
-Q_MIN, Q_MAX  = -5, 5
+Q_MIN, Q_MAX  = -8, 5
 N_Q           = 40
 R2_THRESH_DENSE  = 0.97  # Strict test for q >= 0 (Urban Cores)
-R2_THRESH_SPARSE = 0.80  # Looser test for q < 0 (Suburbs/Fringes)
+R2_THRESH_SPARSE = 0.89  # Looser test for q < 0 (Suburbs/Fringes)
 
 # ── Dark/neon colour palette ──────────────────────────────────────────────────
 BG          = '#0a0a0f'
