@@ -1,0 +1,41 @@
+
+=================================================================
+  MULTIFRACTAL ANALYSIS LOG — Manchester, UK
+=================================================================
+
+[1] LOCATION & NETWORK
+─────────────────────────────────────────────────────────────────
+Target Address   : Manchester, UK
+Radius (meters)  : 8,000
+Network Type     : all
+
+[2] DATASET PROPERTIES
+─────────────────────────────────────────────────────────────────
+Raw Intersections: 151,384
+Retained (Crop)  : 107,383 (70.9%)
+
+[3] TUNING PARAMETERS
+─────────────────────────────────────────────────────────────────
+Grid Sizes (bins): [32, 46, 50, 54, 60, 64, 75, 82, 90]
+Q Range          : [-8, 5]
+N_Q (Steps)      : 40
+Circ mask radius : 0.45  (in normalised [0,1]² space)
+Box threshold    : H > 0
+R² Threshold (+q): 0.97
+R² Threshold (-q): 0.89
+
+[4] RESULTS & REGRESSION VALIDATION
+─────────────────────────────────────────────────────────────────
+Valid q-values   : 9 out of 40 passed R² tests
+D0 (Capacity)    : 1.9559
+D1 (Information) : 1.8280
+D2 (Correlation) : 1.5222
+D0 - D2 Gap      : 0.4337
+Delta Alpha (Δα) : 0.5885
+
+[5] INTERPRETATION FLAGS
+─────────────────────────────────────────────────────────────────
+Gap Status       : Healthy (Organic)
+Hierarchy Status : Passed (D0 >= D1 >= D2)
+Degeneracy       : Clear
+=================================================================
