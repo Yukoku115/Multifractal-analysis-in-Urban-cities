@@ -6,14 +6,14 @@
 [1] LOCATION & NETWORK
 ─────────────────────────────────────────────────────────────────
 Target Address   : Manchester, UK
-Radius (meters)  : 7,000
+Radius (meters)  : 8,000
 Network Type     : all
 Measure Type     : continuous
 
 [2] DATASET PROPERTIES
 ─────────────────────────────────────────────────────────────────
-Raw Intersections: 6,303,816
-Retained (Crop)  : 6,303,816 (100.0%)
+Raw Intersections: 7,924,247
+Retained (Crop)  : 7,924,247 (100.0%)
 
 [3] TUNING PARAMETERS
 ─────────────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ Boundary         : Circular mask  r=0.45
 Q Range          : [-10, 15]
 N_Q (Steps)      : 60
 R² Threshold (+q): 0.97
-R² Threshold (-q): 0.8
+R² Threshold (-q): 0.9
 
 [4] FILTER SUMMARY
 ─────────────────────────────────────────────────────────────────
@@ -31,11 +31,11 @@ Mono violations  : 0 removed
 
 [5] RESULTS
 ─────────────────────────────────────────────────────────────────
-D0 (Capacity)    : 1.9870
-D1 (Information) : 1.9262
-D2 (Correlation) : 1.8875
-D0 - D2 Gap      : 0.0996
-Delta Alpha (Δα) : 0.8568
+D0 (Capacity)    : 1.9855
+D1 (Information) : 1.9285
+D2 (Correlation) : 1.8907
+D0 - D2 Gap      : 0.0948
+Delta Alpha (Δα) : 0.7444
 
 [6] INTERPRETATION FLAGS
 ─────────────────────────────────────────────────────────────────

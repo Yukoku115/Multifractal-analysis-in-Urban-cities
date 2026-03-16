@@ -1,0 +1,9 @@
+{
+    "python.defaultInterpreterPath": "C:\\Users\\Yuko\\anaconda3\\envs\\cmf-env\\python.exe",
+    "python.pythonPath": "C:\\Users\\Yuko\\anaconda3\\envs\\cmf-env\\python.exe",
+    "python.analysis.pythonPath": "C:\\Users\\Yuko\\anaconda3\\envs\\cmf-env\\python.exe",
+    "python.condaPath": "C:\\Users\\Yuko\\anaconda3\\Scripts\\conda.exe",
+    "python.analysis.extraPaths": [
+        "C:\\Users\\Yuko\\anaconda3\\envs\\cmf-env\\Lib\\site-packages"
+    ]
+}

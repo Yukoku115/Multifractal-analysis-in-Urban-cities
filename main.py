@@ -6,29 +6,37 @@ The ONLY things you should need to change are in the CONFIG block below.
 """
 
 import numpy as np
-from multifractal.data       import load_sipp
-from multifractal.boxcount   import run_boxcount, make_circular_mask, make_inscribed_square
+from multifractal.data       import load_sipp, load_continuous_network
+from multifractal.boxcount   import run_boxcount, make_circular_mask, make_full_square
 from multifractal.dimensions import extract_dimensions
-from multifractal             import panels
+from multifractal            import panels
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIG — edit here
 # ─────────────────────────────────────────────────────────────────────────────
 CITY_ADDRESS  = "Manchester, UK"
 RADIUS_METERS = 7000
+Q_MIN, Q_MAX = -10, 15
+N_Q          = 60
+GRID_SIZES   = np.array([16, 22, 32, 40, 50, 64, 75, 90, 110, 128])
 
-Q_MIN, Q_MAX = -8, 5
-N_Q          = 40
-GRID_SIZES   = np.array([54, 60, 64, 75, 82, 90, 100, 115])
 
 R2_THRESH_POS = 0.97   # strict for q >= 0
-R2_THRESH_NEG = 0.89   # looser for q < 0
+R2_THRESH_NEG = 0.80    # looser for q < 0
+ENFORCE_ALPHA_MONO = False  # True → remove q-values where α reverses (Legendre requirement)
+
+
+# ── Choose measure type ───────────────────────────────────────────────────────
+# "points"     → original node intersections (discrete)
+# "continuous" → street edges discretised at 2m (simulates continuous length)
+MEASURE_TYPE = "continuous"
 
 # ── Choose boundary condition ─────────────────────────────────────────────────
-# "inscribed" → grid is the largest square inside the circular data boundary
+# "full" → square boundary
 # "circular"  → full grid with cells outside the circle zeroed
-BOUNDARY_KIND = "inscribed"   # ← change this line to switch
-# ─────────────────────────────────────────────────────────────────────────────
+BOUNDARY_KIND = "circular"   # ← change this line to switch
+# ─────────────────────────────────────────────────────────────────────────
+
 
 def main():
     print(f"\n{'='*60}")
@@ -38,12 +46,16 @@ def main():
     print(f"{'='*60}\n")
 
     # 1 — Data
-    x_norm, y_norm, meta = load_sipp(CITY_ADDRESS, RADIUS_METERS)
+    if MEASURE_TYPE == "continuous":
+        x_norm, y_norm, meta = load_continuous_network(CITY_ADDRESS, RADIUS_METERS, resolution_meters=2.0)
+    else:
+        x_norm, y_norm, meta = load_sipp(CITY_ADDRESS, RADIUS_METERS)
     out_dir = meta['out_dir']
 
+
     # 2 — Boundary strategy
-    if BOUNDARY_KIND == "inscribed":
-        boundary = make_inscribed_square()
+    if BOUNDARY_KIND == "full":
+        boundary = make_full_square()
     elif BOUNDARY_KIND == "circular":
         boundary = make_circular_mask(circ_mask_radius=0.45)
     else:
@@ -52,12 +64,16 @@ def main():
 
     # 3 — Box-counting
     q_values = np.linspace(Q_MIN, Q_MAX, N_Q)
-    matrices = run_boxcount(x_norm, y_norm, boundary, GRID_SIZES, q_values)
+    # For continuous measure, points are very dense (1 per 2m), so min_count=10 ≈ 20m of street.
+    # For discrete points (intersections), min_count=5 means 5 intersections.
+    mc = 10 if MEASURE_TYPE == "continuous" else 5
+    matrices = run_boxcount(x_norm, y_norm, boundary, GRID_SIZES, q_values, min_count=mc)
 
     # 4 — Dimensions
     dims = extract_dimensions(matrices,
                               r2_thresh_pos=R2_THRESH_POS,
-                              r2_thresh_neg=R2_THRESH_NEG)
+                              r2_thresh_neg=R2_THRESH_NEG,
+                              enforce_alpha_mono=ENFORCE_ALPHA_MONO)
 
     # 5 — Panels (comment out any you don't need)
     print("\n[panels] Generating outputs...")
@@ -92,6 +108,7 @@ def _write_log(dims, meta, boundary):
 Target Address   : {meta['city']}
 Radius (meters)  : {meta['radius']:,}
 Network Type     : {meta['network_type']}
+Measure Type     : {meta.get('measure_type', 'points (intersections)')}
 
 [2] DATASET PROPERTIES
 ─────────────────────────────────────────────────────────────────

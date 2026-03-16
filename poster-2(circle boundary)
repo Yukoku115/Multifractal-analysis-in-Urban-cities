@@ -112,7 +112,7 @@ print(f"    After circular crop: {in_circle.sum():,} points ({100*in_circle.mean
 x_norm = (x_circ - x_circ.min()) / (x_circ.max() - x_circ.min())
 y_norm = (y_circ - y_circ.min()) / (y_circ.max() - y_circ.min())
 
-GRID_SIZES = np.array([54, 60, 64, 75, 82, 90, 100, 115])
+GRID_SIZES = np.array([32, 40, 50, 54, 60, 64, 75, 82, 90])
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. Box-counting  (inscribed square grid)

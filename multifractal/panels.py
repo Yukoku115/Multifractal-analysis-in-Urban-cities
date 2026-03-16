@@ -221,8 +221,12 @@ def spectrum(dims: dict, meta: dict, out_dir: str):
     D0, delta_alpha, peak_idx  = dims['D0'], dims['delta_alpha'], dims['peak_idx']
 
     if len(f_plot) > 1:
-        ax.plot(alpha_plot, f_plot, '-', color='#ffffff', alpha=0.12, lw=4, zorder=1)
-        ax.plot(alpha_plot, f_plot, '-', color='#aaaacc', alpha=0.5, lw=1.2, zorder=2)
+        # Sort by alpha for a smooth parabola — q-order ≠ alpha-order when
+        # negative-q points scatter out of sequence.
+        _si = np.argsort(alpha_plot)
+        _a_s, _f_s = alpha_plot[_si], f_plot[_si]
+        ax.plot(_a_s, _f_s, '-', color='#ffffff', alpha=0.12, lw=4, zorder=1)
+        ax.plot(_a_s, _f_s, '-', color='#aaaacc', alpha=0.5, lw=1.2, zorder=2)
         norm_q = Normalize(vmin=q_plot.min(), vmax=q_plot.max())
         ax.scatter(alpha_plot, f_plot, c=q_plot, cmap=plt.cm.plasma, norm=norm_q,
                    s=100, edgecolors='white', linewidths=0.5, zorder=4, alpha=0.95)
@@ -361,13 +365,17 @@ def Dq(dims: dict, meta: dict, out_dir: str):
 
     q_plot, tau_plot = dims['q_plot'], dims['tau_plot']
     D0, D1, D2       = dims['D0'], dims['D1'], dims['D2']
+    Dq_arr           = dims['Dq_arr']    # pre-built in dimensions.py — same source as D0/D1/D2
 
-    if len(tau_plot) > 1:
-        Dq_arr = np.full_like(q_plot, np.nan)
-        for k, q in enumerate(q_plot):
-            Dq_arr[k] = D1 if np.isclose(q, 1.0) else tau_plot[k] / (q - 1)
-
+    if len(Dq_arr) > 1:
         valid = ~np.isnan(Dq_arr)
+
+        # ── Tight y-axis so the curve fills the plot ──────────────────────────
+        _d_vals  = Dq_arr[valid]
+        _d_range = _d_vals.max() - _d_vals.min()
+        _margin  = max(_d_range * 0.30, 0.05)
+        ax.set_ylim(_d_vals.min() - _margin, _d_vals.max() + _margin * 1.8)
+
         ax.fill_between(q_plot[valid], Dq_arr[valid],
                         alpha=0.10, color=ACCENT2, zorder=1)
         ax.plot(q_plot[valid], Dq_arr[valid], '-',
@@ -378,24 +386,27 @@ def Dq(dims: dict, meta: dict, out_dir: str):
                    s=70, edgecolors='white', linewidths=0.5, zorder=3, alpha=0.95)
 
         ax.axhline(D0, ls='--', color=MONO_COLOR, lw=1.5, alpha=0.7,
-                   label=f'Monofractal ref  D = {D0:.3f}')
-        ax.axhline(2.0, ls='--', color='#444466', lw=1.0, alpha=0.6)
-        ax.text(q_plot[valid].max(), 2.02, 'Euclidean limit',
-                color='#666688', fontsize=8, ha='right', va='bottom')
+                   label=f'Monofractal ref  D₀ = {D0:.3f}')
 
-        for q_mark, d_mark, label, col in [
-            (0, D0, '$D_0$', ACCENT1),
-            (1, D1, '$D_1$', ACCENT2),
-            (2, D2, '$D_2$', ACCENT3),
+        # ── Text labels on each vertical marker ───────────────────────────────
+        # d_mark is interpolated from the SAME Dq_arr used to draw the curve,
+        # so the label number is guaranteed to match the visual intersection.
+        _trans    = ax.get_xaxis_transform()
+        _q_valid  = q_plot[valid]
+        _dq_valid = Dq_arr[valid]
+        for q_mark, label, col in [
+            (0, '$D_0$', ACCENT1),
+            (1, '$D_1$', ACCENT2),
+            (2, '$D_2$', ACCENT3),
         ]:
-            idx = np.argmin(np.abs(q_plot - q_mark))
-            ax.axvline(q_mark, color=col, ls=':', lw=1.0, alpha=0.5)
-            d_val = Dq_arr[idx] if not np.isnan(Dq_arr[idx]) else d_mark
-            ax.annotate(f'{label} = {d_mark:.3f}',
-                        xy=(q_mark, d_val),
-                        xytext=(q_mark + 0.15, d_val - 0.06),
-                        color=col, fontsize=9, fontweight='bold',
-                        arrowprops=dict(arrowstyle='->', color=col, lw=1.0))
+            d_mark = float(np.interp(q_mark, _q_valid, _dq_valid))
+            ax.axvline(q_mark, color=col, ls=':', lw=1.2, alpha=0.6)
+            ax.text(q_mark + 0.08, 0.97, f'{label}\n{d_mark:.3f}',
+                    transform=_trans,
+                    color=col, fontsize=8.5, fontweight='bold',
+                    va='top', ha='left',
+                    bbox=dict(boxstyle='round,pad=0.28', fc=PANEL_BG,
+                              ec=col, lw=0.8, alpha=0.88))
 
         cb = fig.colorbar(ScalarMappable(norm=norm_q, cmap=plt.cm.plasma),
                           ax=ax, fraction=0.03, pad=0.02)
