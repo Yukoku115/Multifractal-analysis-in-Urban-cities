@@ -3,9 +3,6 @@
 Regression, quality filters, and dimension extraction.
 
     extract_dimensions(matrices, r2_pos, r2_neg) → dims dict
-
-The extraction loop is a direct copy of city_multifractal_v5.py — no
-refactoring, no extra gates, no monotonicity filter.
 """
 
 import numpy as np

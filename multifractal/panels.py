@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib.cm import ScalarMappable
 from scipy.stats import linregress
+from scipy.ndimage import gaussian_filter
 
 # ── Dark/neon palette ─────────────────────────────────────────────────────────
 BG          = '#0a0a0f'
@@ -428,3 +429,134 @@ def Dq(dims: dict, meta: dict, out_dir: str):
     path = os.path.join(out_dir, f"{meta['slug']}_F_Dq.png")
     _save(fig, path)
     plt.rcParams.update(plt.rcParamsDefault)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# G — 2D Energy Map  (α landscape)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def energy_map_2d(x_norm, y_norm, grid_sizes: np.ndarray,
+                  meta: dict, out_dir: str):
+    """
+    2D colormap plot of the local Energy state (α) landscape.
+
+    Physics:
+        α_i = ln(p_i) / ln(ε)  is the local singularity strength (≈ Energy).
+        Dense cores have LOW α  (ground state).
+        Sparse edges have HIGH α (excited states).
+    """
+    # ── Render at ultra-high resolution (independent of box-counting grid) ────
+    finest_bins = 400  # moderate: sharp enough detail, enough mass-per-cell for contrast
+    epsilon     = 1.0 / finest_bins
+
+    # ── Build the 2D spatial histogram → probability p_i ──────────────────────
+    H, xedges, yedges = np.histogram2d(
+        x_norm, y_norm, bins=finest_bins,
+        range=[[0.0, 1.0], [0.0, 1.0]]
+    )
+
+    total = H.sum()
+    P = np.where(H > 0, H / total, np.nan)
+
+    # ── Local singularity strength: α_i = ln(p_i) / ln(ε) ────────────────────
+    ln_eps = np.log(epsilon)
+    alpha_grid = np.where(~np.isnan(P), np.log(P) / ln_eps, np.nan)
+
+    Z = alpha_grid
+
+    # ── Plot 2D Energy Map (matplotlib) ───────────────────────────────────────
+    plt.rcParams.update(_DARK_RCPARAMS)
+    fig, ax = plt.subplots(figsize=(10, 8), facecolor=BG)
+    ax.set_facecolor(BG)
+
+    # Gentle 5/95 percentile clip: uses full colour range without amplifying noise.
+    # magma_r → dense low-α centre = bright white/gold, sparse = dark purple/black.
+    valid_vals = Z[~np.isnan(Z)]
+    vmin = np.percentile(valid_vals, 5)
+    vmax = np.percentile(valid_vals, 95)
+
+    # Plot the 2D grid
+    im = ax.imshow(
+        Z.T,
+        origin='lower',
+        extent=[0, 1, 0, 1],
+        cmap='plasma_r',
+        vmin=vmin,
+        vmax=vmax,
+        interpolation='nearest'
+    )
+
+    # ── Formatting ────────────────────────────────────────────────────────────
+    city, radius = meta['city'], meta['radius']
+    ax.set_title(
+        f"2D Energy Landscape  ·  {city}  ·  {radius/1000:.0f} km core\n"
+        r"$\alpha$ (Dense cores $\rightarrow$ bright/lowest energy potential wells)",
+        fontsize=13, color=TEXT, pad=15)
+        
+    ax.set_xlabel('Normalized x', fontsize=11, color=TEXT)
+    ax.set_ylabel('Normalized y', fontsize=11, color=TEXT)
+    ax.tick_params(colors='#666688')
+    
+    # No grid — it overlays on the image
+
+    # Colourbar
+    cb = fig.colorbar(im, ax=ax, shrink=0.8, pad=0.03)
+    cb.set_label(r'Energy State  $\alpha$', color=TEXT, fontsize=11)
+    cb.ax.yaxis.set_tick_params(color=TEXT)
+    plt.setp(cb.ax.yaxis.get_ticklabels(), color=TEXT)
+    cb.outline.set_edgecolor('#2a2a4a')
+
+    # Save
+    path = os.path.join(out_dir, f"{meta['slug']}_G_2D_energy_map.png")
+    _save(fig, path, facecolor=BG)
+    plt.rcParams.update(plt.rcParamsDefault)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# H — Singularity Spectrum Evolution (f(α) vs α over time)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def spectrum_evolution(dims_list: list, labels: list, out_path: str, title: str = "Evolution of Singularity Spectrum"):
+    """
+    Plots multiple singularity spectra on the same graph to compare different time periods
+    or different cities.
+    
+    dims_list: list of `dims` dictionaries (extracted from dimensions.py)
+    labels: list of strings (e.g. ['1880', '1920', '2010'] or ['Paris', 'Manchester'])
+    out_path: absolute or relative path to save the .png file (e.g. 'output/evolution.png')
+    """
+    plt.rcParams.update(_DARK_RCPARAMS)
+    fig, ax = plt.subplots(figsize=(10, 7), facecolor=BG)
+    ax.set_facecolor(PANEL_BG)
+    for sp in ax.spines.values(): sp.set_edgecolor('#2a2a4a')
+
+    # Get a nice colormap for the lines
+    colors = plt.cm.plasma(np.linspace(0.1, 0.9, len(dims_list)))
+
+    for i, (dims, label) in enumerate(zip(dims_list, labels)):
+        f_plot = dims['f_plot']
+        alpha_plot = dims['alpha_plot']
+        
+        if len(f_plot) > 1:
+            _si = np.argsort(alpha_plot)
+            _a_s, _f_s = alpha_plot[_si], f_plot[_si]
+            
+            # Using triangles ('v-') similar to the paper reference for some aesthetics
+            ax.plot(_a_s, _f_s, 'v-', color=colors[i], alpha=0.9, lw=2, ms=6, 
+                    label=label, markeredgecolor='white', markeredgewidth=0.4)
+
+    ax.axhline(2.0, ls='--', color='#444466', lw=1, alpha=0.6)
+    ax.set_title(title, fontsize=13, color=TEXT, pad=12)
+    ax.set_xlabel(r"Singularity strength  $\alpha$", fontsize=12, color=TEXT)
+    ax.set_ylabel(r"Fractal dimension  $f(\alpha)$", fontsize=12, color=TEXT)
+    
+    ax.tick_params(colors='#666688')
+    ax.grid(True, color=GRID_COLOR, lw=0.8, ls='--')
+    
+    # Legend in the top right
+    ax.legend(fontsize=11, facecolor=PANEL_BG, edgecolor='#2a2a4a', labelcolor=TEXT, loc='upper right')
+    
+    _save(fig, out_path)
+    plt.rcParams.update(plt.rcParamsDefault)
+
+
